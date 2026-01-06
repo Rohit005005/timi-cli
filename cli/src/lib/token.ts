@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { CONFIG_DIR, TOKEN_FILE } from "../cli/commands/auth/login";
+import { CONFIG_DIR, TOKEN_FILE } from "../commands/auth/login";
 import chalk from "chalk";
 
 export interface AuthToken {

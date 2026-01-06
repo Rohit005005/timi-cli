@@ -1,14 +1,11 @@
-import { prisma } from "../../../lib/prisma";
 import { getStoredToken } from "../../lib/token";
 
 export type createConversationType = {
-  userId: string;
   mode: string;
   title?: string | null;
 };
 
 export type getOrCreateConversationType = {
-  userId: string;
   mode: string;
   conversationId: string | null;
 };
@@ -25,11 +22,6 @@ export type getMessagesType = {
 
 export type deleteConversationType = {
   conversationId: string;
-  userId: string;
-};
-
-export type getUserConversationType = {
-  userId: string;
 };
 
 export type updateTitleType = {
@@ -47,7 +39,6 @@ export type messagesType = {
 
 export class ChatService {
   async createConversation({
-    userId,
     mode = "chat",
     title = null,
   }: createConversationType) {
@@ -62,7 +53,6 @@ export class ChatService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId,
           mode,
           title,
         }),
@@ -78,7 +68,6 @@ export class ChatService {
   }
 
   async getOrCreateConversation({
-    userId,
     conversationId = null,
     mode = "chat",
   }: getOrCreateConversationType) {
@@ -86,17 +75,12 @@ export class ChatService {
       const token = await getStoredToken();
 
       const response = await fetch(
-        `${process.env.SERVER_URL}/api/conversation/find`,
+        `${process.env.SERVER_URL}/api/conversation/find/${conversationId}`,
         {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token.access_token}`,
-            "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            userId,
-            conversationId,
-          }),
         },
       );
 
@@ -108,65 +92,124 @@ export class ChatService {
       if (response) return await response.json();
     }
 
-    return this.createConversation({ userId, mode });
+    return this.createConversation({ mode });
   }
 
   async addMessage({ conversationId, role, content }: addMessageType) {
-    const contentStr =
-      typeof content === "string" ? content : JSON.stringify(content);
+    const token = await getStoredToken();
 
-    return await prisma.message.create({
-      data: {
+    const response = await fetch(`${process.env.SERVER_URL}/api/message/add`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
         conversationId,
         role,
-        content: contentStr,
-      },
+        content,
+      }),
     });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error || "Failed to add message");
+    }
+
+    if (response) return await response.json();
   }
 
   async getMessages({ conversationId }: getMessagesType) {
-    const messages = await prisma.message.findMany({
-      where: {
-        conversationId,
-      },
-      orderBy: { createdAt: "asc" },
-    });
+    const token = await getStoredToken();
 
-    return messages.map((msg) => ({
-      ...msg,
-      content: msg.content,
-    }));
-  }
-
-  async getUserConversation({ userId }: getUserConversationType) {
-    return await prisma.conversation.findMany({
-      where: { userId },
-      orderBy: { updatedAt: "desc" },
-      include: {
-        messages: {
-          take: 1,
-          orderBy: { createdAt: "desc" },
+    const response = await fetch(
+      `${process.env.SERVER_URL}/api/message/find/${conversationId}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
         },
       },
-    });
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error || "Failed to find conversation");
+    }
+
+    if (response) return await response.json();
   }
 
-  async deleteConversation({ conversationId, userId }: deleteConversationType) {
-    return await prisma.conversation.deleteMany({
-      where: {
-        id: conversationId,
-        userId,
+  async getUserConversation() {
+    const token = await getStoredToken();
+
+    const response = await fetch(
+      `${process.env.SERVER_URL}/api/conversation/findAll`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+        },
       },
-    });
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error || "Failed to find user conversations");
+    }
+
+    if (response) return await response.json();
+  }
+
+  async deleteConversation({ conversationId }: deleteConversationType) {
+    const token = await getStoredToken();
+
+    const response = await fetch(
+      `${process.env.SERVER_URL}/api/conversation/delete`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error || "Failed to delete conversation");
+    }
+
+    if (response) return await response.json();
   }
 
   async updateTitle({ conversationId, title }: updateTitleType) {
-    return prisma.conversation.update({
-      where: { id: conversationId },
-      data: {
-        title,
+    const token = await getStoredToken();
+
+    const response = await fetch(
+      `${process.env.SERVER_URL}/api/conversation/update`,
+      {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          conversationId,
+          title,
+        }),
       },
-    });
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error || "Failed to update conversation");
+    }
+
+    if (response) return await response.json();
   }
 
   formatMessagesForAi(messages: messagesType[]) {

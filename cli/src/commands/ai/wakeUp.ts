@@ -24,7 +24,6 @@ export const wakeUpAction = async () => {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token.access_token}`,
-      "Content-Type": "application/json",
     },
   });
 

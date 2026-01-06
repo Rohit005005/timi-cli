@@ -56,7 +56,6 @@ export async function loginAction(opts: any) {
     method: "GET",
     headers: {
       Authorization: `Bearer ${existingToken.access_token}`,
-      "Content-Type": "application/json",
     },
   });
 

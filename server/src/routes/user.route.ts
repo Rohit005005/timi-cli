@@ -26,6 +26,7 @@ userRouter.get("/user", extractToken, async (req: Request, res: Response) => {
 
     return res.json(user);
   } catch (error) {
+    console.log("Error finding user: ", error);
     res
       .status(500)
       .json({ error: "Server error: failed to get user from db !!" });
@@ -40,6 +41,7 @@ userRouter.get(
       const clientId = process.env.GITHUB_CLIENT_ID;
       res.json(clientId);
     } catch (error) {
+      console.log("Error finding cliend id: ", error);
       res.status(500).json({ error: "Server error: failed to get client id" });
     }
   },

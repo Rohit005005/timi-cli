@@ -1,8 +1,7 @@
 import yoctoSpinner from "yocto-spinner";
-import { getStoredToken } from "../../../lib/token";
+import { getStoredToken } from "../../lib/token";
 import { AiService } from "../services/ai.service";
 import { addMessageType, ChatService } from "../services/chat.service";
-import { prisma } from "../../../lib/prisma";
 import boxen from "boxen";
 import chalk from "chalk";
 import { cancel, confirm, intro, isCancel, outro, text } from "@clack/prompts";
@@ -10,7 +9,6 @@ import { conversationType } from "./chat";
 import { generateApplication } from "../../config/agent.config";
 
 type initConversationType = {
-  userId: string;
   conversationId: string | null;
 };
 
@@ -24,13 +22,19 @@ async function getUserFromToken() {
   }
   const spinner = yoctoSpinner({ text: "Authenticating..." }).start();
 
-  const user = await prisma.user.findFirst({
-    where: {
-      sessions: {
-        some: { token: token.access_token },
-      },
+  const response = await fetch(`${process.env.SERVER_URL}/api/user`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token.access_token}`,
     },
   });
+
+  if (!response.ok) {
+    spinner.error("Enable to fetch user");
+    throw new Error("Enable to fetch user. Try agian.");
+  }
+
+  const user = await response.json();
 
   if (!user) {
     spinner.error("User not found");
@@ -43,13 +47,11 @@ async function getUserFromToken() {
 }
 
 async function initConversation({
-  userId,
   conversationId = null,
 }: initConversationType) {
   const spinner = yoctoSpinner({ text: "Loading conversation..." }).start();
 
   const conversation = await chatService.getOrCreateConversation({
-    userId,
     conversationId,
     mode: "agent",
   });
@@ -207,8 +209,6 @@ export async function startAgentChat(conversationId: string | null = null) {
       ),
     );
 
-    const user = await getUserFromToken();
-
     const shouldContinue = await confirm({
       message:
         "The agent will create files and folders in the current directory. Continue ?",
@@ -221,7 +221,6 @@ export async function startAgentChat(conversationId: string | null = null) {
     }
 
     const conversation = await initConversation({
-      userId: user.id,
       conversationId: conversationId,
     });
 

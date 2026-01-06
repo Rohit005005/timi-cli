@@ -2,13 +2,14 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { deviceAuthorization } from "better-auth/plugins";
 import { prisma } from "./prisma";
+import "dotenv/config";
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  baseURL: "http://localhost:8000",
-  trustedOrigins: ["http://localhost:3000"],
+  baseURL: process.env.BASE_URL,
+  trustedOrigins: [process.env.FRONTEND_URL!],
   socialProviders: {
     github: {
       clientId: process.env.GITHUB_CLIENT_ID as string,

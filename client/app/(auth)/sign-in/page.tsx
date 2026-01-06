@@ -33,7 +33,7 @@ const Page = () => {
         onClick={async () => {
           await authClient.signIn.social({
             provider: "github",
-            callbackURL: "http://localhost:3000",
+            callbackURL: process.env.FRONTEND_URL,
           });
         }}
       >

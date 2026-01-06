@@ -1,10 +1,10 @@
 {
-  "name": "server",
+  "name": "cli",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "bin": {
-    "ai-cli": "./src/cli/bin.js"
+    "ai-cli": "./bin.js"
   },
   "scripts": {
     "build": "tsc",

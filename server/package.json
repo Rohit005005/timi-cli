@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "bin": {
-    "ai-cli": "./src/cli/bin.js"
-  },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",

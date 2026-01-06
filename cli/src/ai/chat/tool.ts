@@ -18,8 +18,7 @@ import {
   resetTools,
 } from "../../config/tool.config";
 import { ModelMessage } from "ai";
-import { prisma } from "../../../lib/prisma";
-import { getStoredToken } from "../../../lib/token";
+import { getStoredToken } from "../../lib/token";
 import { AiService } from "../services/ai.service";
 import {
   addMessageType,
@@ -114,13 +113,19 @@ async function getUserFromToken() {
   }
   const spinner = yoctoSpinner({ text: "Authenticating..." }).start();
 
-  const user = await prisma.user.findFirst({
-    where: {
-      sessions: {
-        some: { token: token.access_token },
-      },
+  const response = await fetch(`${process.env.SERVER_URL}/api/user`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token.access_token}`,
     },
   });
+
+  if (!response.ok) {
+    spinner.error("Enable to fetch user");
+    throw new Error("Enable to fetch user. Try agian.");
+  }
+
+  const user = await response.json();
 
   if (!user) {
     spinner.error("User not found");
@@ -175,14 +180,12 @@ async function selectTools() {
 }
 
 async function initConversation({
-  userId,
   conversationId,
   mode,
 }: initConversationType) {
   const spinner = yoctoSpinner({ text: "Loading conversation..." }).start();
 
   const conversation = await chatService.getOrCreateConversation({
-    userId,
     conversationId,
     mode,
   });
@@ -444,12 +447,9 @@ export async function startToolChat(conversationId: string | null = null) {
       }),
     );
 
-    const user = await getUserFromToken();
-
     await selectTools();
 
     const conversation = await initConversation({
-      userId: user.id,
       conversationId: conversationId,
       mode: "tool",
     });
