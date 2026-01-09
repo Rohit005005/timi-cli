@@ -7,12 +7,13 @@ import chalk from "chalk";
 import { cancel, confirm, intro, isCancel, outro, text } from "@clack/prompts";
 import { conversationType } from "./chat";
 import { generateApplication } from "../../config/agent.config";
+import { editor } from "@inquirer/prompts";
 
 type initConversationType = {
   conversationId: string | null;
 };
 
-const aiService = new AiService();
+let aiService: AiService;
 const chatService = new ChatService();
 
 async function getUserFromToken() {
@@ -90,7 +91,7 @@ async function agentLoop(conversation: conversationType) {
       `${chalk.white("Build a todo app with React and Tailwind")}\n` +
       `${chalk.white("Create a REST API with Express and MongoDB")}\n` +
       `${chalk.white("Make a weather app using OpenWeatherMap API")}\n\n` +
-      `${chalk.gray('Type "exit" to end the session')}`,
+      `${chalk.gray('Type "exit" to end the session')}\n ${chalk.gray("Type '/edit' to open external editor (for multi-line)")}`,
     {
       padding: 1,
       margin: { bottom: 1 },
@@ -110,6 +111,9 @@ async function agentLoop(conversation: conversationType) {
         if (!value || value.trim().length === 0) {
           return "Description can't be empty";
         }
+        if (value.trim() === "/edit") {
+          return;
+        }
         if (value.trim().length < 10) {
           return "Please provide more details (atleast 10 characters)";
         }
@@ -120,12 +124,28 @@ async function agentLoop(conversation: conversationType) {
       process.exit(0);
     }
 
-    if (userInput.toLowerCase() === "exit") {
-      console.log(chalk.yellow("\n Agent session cancelled"));
+    let finalContent = userInput.toString();
+
+    if (finalContent.trim() === "/edit") {
+      finalContent = await editor({
+        message: "Type your message below (Save and close file to submit)",
+        postfix: ".md",
+      });
+    }
+
+    if (finalContent.toLowerCase().trim() === "exit") {
+      const exitBox = boxen(chalk.yellow("Chat session ended !!"), {
+        padding: 1,
+        margin: 1,
+        borderStyle: "round",
+        backgroundColor: "yellow",
+      });
+
+      console.log(exitBox);
       break;
     }
 
-    const userBox = boxen(chalk.white(userInput), {
+    const userBox = boxen(chalk.white(finalContent), {
       padding: 1,
       borderColor: "blue",
       borderStyle: "round",
@@ -138,13 +158,13 @@ async function agentLoop(conversation: conversationType) {
 
     await saveMessage({
       conversationId: conversation.id,
-      content: userInput,
+      content: finalContent,
       role: "user",
     });
 
     try {
       const result = await generateApplication(
-        userInput,
+        finalContent,
         aiService,
         process.cwd(),
       );
@@ -170,8 +190,6 @@ async function agentLoop(conversation: conversationType) {
         if (isCancel(continuePrompt) || !continuePrompt) {
           console.log(chalk.yellow("Greate! Check your new application.\n"));
           break;
-        } else {
-          throw new Error("Generation returned no result");
         }
       }
     } catch (error) {
@@ -197,6 +215,7 @@ async function agentLoop(conversation: conversationType) {
 
 export async function startAgentChat(conversationId: string | null = null) {
   try {
+    aiService = new AiService();
     intro(
       boxen(
         chalk.magenta.bold("AI CLI Agent Mode \n") +

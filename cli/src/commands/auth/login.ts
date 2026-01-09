@@ -1,4 +1,4 @@
-import { intro, outro, cancel, isCancel, confirm } from "@clack/prompts";
+import { intro, outro, cancel, isCancel, confirm, text } from "@clack/prompts";
 
 import { logger } from "better-auth";
 
@@ -16,10 +16,12 @@ import * as z from "zod/v4";
 import dotenv from "dotenv";
 import {
   AuthToken,
+  clearStoredApiConfig,
   clearStoredToken,
   getStoredToken,
   isTokenExpired,
   requireAuth,
+  storeApiKey,
   storeToken,
 } from "../../lib/token";
 
@@ -34,6 +36,7 @@ type AuthClient = ReturnType<
 const URL = process.env.SERVER_URL;
 export const CONFIG_DIR = path.join(os.homedir(), ".better-auth");
 export const TOKEN_FILE = path.join(CONFIG_DIR, "token.json");
+export const API_KEY_FILE = path.join(CONFIG_DIR, "apiConfig.json");
 
 export async function loginAction(opts: any) {
   intro(chalk.bold("Auth CLI Login !!"));
@@ -52,7 +55,7 @@ export async function loginAction(opts: any) {
       process.exit(0);
     }
   }
-  const response = await fetch(`${process.env.SERVER_URL}/clientId`, {
+  const response = await fetch(`${process.env.SERVER_URL}/api/clientId`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${existingToken.access_token}`,
@@ -148,27 +151,54 @@ export async function loginAction(opts: any) {
       interval,
     );
 
-    if (token) {
-      const saved = await storeToken(token);
+    //getting api key from user
+    const apiInput = await text({
+      message: chalk.blue("Your api key"),
+      placeholder: "Type your api key...",
+      validate(value) {
+        if (!value || value.trim().length === 0) {
+          return "Message can't be empty";
+        }
+      },
+    });
 
-      if (!saved) {
+    if (isCancel(apiInput)) {
+      cancel("Setup cancelled. You are logged in, but AI features won't work.");
+      process.exit(0);
+    }
+
+    if (token && apiInput) {
+      const tokenSaved = await storeToken(token);
+      const apiKeySaved = await storeApiKey({
+        apiKey: apiInput.toString(),
+      });
+
+      if (!tokenSaved) {
         console.log(
           chalk.yellow("\n Warning: Could not save authentication token."),
         );
 
         console.log(chalk.yellow("You may need to login again on next use."));
       }
+
+      if (!apiKeySaved) {
+        console.log(chalk.yellow("\n Warning: Could not save api key."));
+
+        console.log(chalk.yellow("Please try login again."));
+        process.exit(1);
+      }
     }
 
     outro(chalk.green("Login successfully !!"));
 
     console.log(chalk.gray(`\n Token saved to: ${TOKEN_FILE}`));
+    console.log(chalk.gray(`\n Api key saved to: ${API_KEY_FILE}`));
 
     console.log(
-      chalk.gray("You can now use AI commands without logging in again. \n"),
+      chalk.gray.bold(
+        "\nYou can now use AI commands without logging in again. \n",
+      ),
     );
-
-    //user db stuff later
   } catch (error) {
     spinner.stop();
     console.log(chalk.red("\n Login failed:"), error);
@@ -208,10 +238,6 @@ async function pollForToken(
         });
 
         if (data?.access_token) {
-          console.log(
-            chalk.bold.yellow(`Your access token : ${data.access_token}`),
-          );
-
           spinner.stop();
           resolve(data as AuthToken);
           return;
@@ -266,12 +292,14 @@ export async function logoutAction() {
     process.exit(0);
   }
 
-  const cleared = await clearStoredToken();
+  const tokenCleared = await clearStoredToken();
 
-  if (cleared) {
+  const apiConfigCleared = await clearStoredApiConfig();
+
+  if (tokenCleared && apiConfigCleared) {
     outro(chalk.green("Successfully logged out !!"));
   } else {
-    console.log(chalk.yellow("Could not clear token file."));
+    console.log(chalk.yellow("Could not clear token & config file."));
   }
 }
 

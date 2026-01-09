@@ -16,6 +16,8 @@
     // "types": ["node"],
     // and npm install -D @types/node
 
+    "typeRoots": ["./node_modules/@types", "./src/types"],
+
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
 

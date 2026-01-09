@@ -1,3 +1,4 @@
+/// <reference path="./types/express.d.ts" />
 import { fromNodeHeaders, toNodeHandler } from "better-auth/node";
 import "dotenv/config";
 import express from "express";
@@ -23,10 +24,8 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 app.use(express.json());
 
 app.get("/device", async (req, res) => {
-  const { user_code } = req.query;
-  res.redirect(
-    `http://${process.env.FRONTEND_URL}/device?user_code=${user_code}`,
-  );
+  //const { user_code } = req.query;
+  res.redirect(`${process.env.FRONTEND_URL}/device`);
 });
 
 app.get("/", (req, res) => {

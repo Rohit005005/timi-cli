@@ -3,16 +3,32 @@ import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { LoaderCircle, ShieldUser } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const DeviceAuthorizationPage = () => {
   const [userCode, setUserCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const { data, isPending } = authClient.useSession();
+  const router = useRouter();
 
   const isDisabled = userCode.trim().length === 0;
 
-  const router = useRouter();
+  useEffect(() => {
+    if (!isPending) {
+      if (!data?.session || !data.user) {
+        router.push("/sign-in");
+      }
+    }
+  }, [data, isPending, router]);
+
+  if (isPending) {
+    return (
+      <div className="flex flex-col h-screen justify-center items-center">
+        <LoaderCircle className="size-10 animate-spin text-white" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -11,6 +11,7 @@ import {
 } from "../services/chat.service";
 import { getStoredToken } from "../../lib/token";
 import { ModelMessage } from "ai";
+import { editor } from "@inquirer/prompts";
 
 export type startChatType = {
   mode: string;
@@ -35,6 +36,16 @@ export type conversationType = {
   createdAt: Date;
   updatedAt: Date;
 };
+
+function unescapeHtml(str: string) {
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
 
 class CustomTerminalRenderer extends Renderer {
   // FIX: 'code' now receives a single object containing the properties
@@ -73,8 +84,14 @@ class CustomTerminalRenderer extends Renderer {
     return `  • ${content}\n`;
   }
 
-  paragraph({ text }: { text: string }): string {
-    return text + "\n";
+  paragraph(token: Tokens.Paragraph): string {
+    // parseInline processes the children tokens (bold, italic, etc.)
+    return this.parser.parseInline(token.tokens) + "\n";
+  }
+
+  text(token: Tokens.Text | Tokens.Escape): string {
+    // Both Text and Escape tokens have a 'text' property
+    return unescapeHtml(token.text);
   }
 
   strong({ text }: { text: string }): string {
@@ -108,7 +125,7 @@ class CustomTerminalRenderer extends Renderer {
 
 const terminalRenderer = new CustomTerminalRenderer();
 
-const aiService = new AiService();
+let aiService: AiService;
 const chatService = new ChatService();
 
 async function getUserFromToken() {
@@ -267,7 +284,7 @@ async function getAiResponse(conversationId: string) {
 
 async function chatLoop(conversation: conversationType) {
   const helpBox = boxen(
-    `${chalk.gray("Type your message and press enter")}\n ${chalk.gray("Markdown formatting is supported in responses")}\n ${chalk.gray("Type 'exit' to end conversation")}\n ${chalk.gray("Press ctrl+c to quit anytime")}`,
+    `${chalk.gray("Type your message and press enter")}\n ${chalk.gray("Markdown formatting is supported in responses")}\n ${chalk.gray("Type 'exit' to end conversation")}\n ${chalk.gray("Press ctrl+c to quit anytime")}\n ${chalk.gray("Type '/edit' to open external editor (for multi-line)")}`,
     {
       padding: 1,
       margin: { bottom: 1 },
@@ -302,7 +319,16 @@ async function chatLoop(conversation: conversationType) {
       process.exit(0);
     }
 
-    if (userInput.toLowerCase() === "exit") {
+    let finalContent = userInput.toString();
+
+    if (finalContent.trim() === "/edit") {
+      finalContent = await editor({
+        message: "Type your message below (Save and close file to submit)",
+        postfix: ".md",
+      });
+    }
+
+    if (finalContent.toLowerCase().trim() === "exit") {
       const exitBox = boxen(chalk.yellow("Chat session ended !!"), {
         padding: 1,
         margin: 1,
@@ -316,7 +342,7 @@ async function chatLoop(conversation: conversationType) {
 
     await saveMessage({
       conversationId: conversation.id,
-      content: userInput,
+      content: finalContent,
       role: "user",
     });
 
@@ -350,6 +376,7 @@ export async function startChat({
   conversationId = null,
 }: startChatType) {
   try {
+    aiService = new AiService();
     intro(
       boxen(chalk.cyan("Ai Cli Chat"), {
         padding: 1,

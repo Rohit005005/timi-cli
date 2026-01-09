@@ -30,6 +30,17 @@ import {
   initConversationType,
   updateConversationTitleType,
 } from "./chat";
+import { editor } from "@inquirer/prompts";
+
+function unescapeHtml(str: string) {
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
 
 class CustomTerminalRenderer extends Renderer {
   // FIX: 'code' now receives a single object containing the properties
@@ -68,8 +79,14 @@ class CustomTerminalRenderer extends Renderer {
     return `  • ${content}\n`;
   }
 
-  paragraph({ text }: { text: string }): string {
-    return text + "\n";
+  paragraph(token: Tokens.Paragraph): string {
+    // parseInline processes the children tokens (bold, italic, etc.)
+    return this.parser.parseInline(token.tokens) + "\n";
+  }
+
+  text(token: Tokens.Text | Tokens.Escape): string {
+    // Both Text and Escape tokens have a 'text' property
+    return unescapeHtml(token.text);
   }
 
   strong({ text }: { text: string }): string {
@@ -103,7 +120,7 @@ class CustomTerminalRenderer extends Renderer {
 
 const terminalRenderer = new CustomTerminalRenderer();
 
-const aiService = new AiService();
+let aiService: AiService;
 const chatService = new ChatService();
 
 async function getUserFromToken() {
@@ -359,7 +376,7 @@ async function getAiResponse(conversationId: string) {
 async function chatLoop(conversation: conversationType) {
   const enabledToolsNames = getEnabledToolNames();
   const helpBox = boxen(
-    `${chalk.gray("Type your message and press enter")}\n ${chalk.gray("AI has access to: ")}\n chalk.gray(${enabledToolsNames.length > 0 ? enabledToolsNames.join(", ") : "No tools"})\n ${chalk.gray("Press ctrl+c to quit anytime")}`,
+    `${chalk.gray("Type your message and press enter")}\n ${chalk.gray("AI has access to: ")}\n chalk.gray(${enabledToolsNames.length > 0 ? enabledToolsNames.join(", ") : "No tools"})\n ${chalk.gray("Press ctrl+c to quit anytime")}\n ${chalk.gray("Type '/edit' to open external editor (for multi-line)")}`,
     {
       padding: 1,
       margin: { bottom: 1 },
@@ -393,8 +410,16 @@ async function chatLoop(conversation: conversationType) {
       console.log(exitBox);
       process.exit(0);
     }
+    let finalContent = userInput.toString();
 
-    if (userInput.toLowerCase() === "exit") {
+    if (finalContent.trim() === "/edit") {
+      finalContent = await editor({
+        message: "Type your message below (Save and close file to submit)",
+        postfix: ".md",
+      });
+    }
+
+    if (finalContent.toLowerCase().trim() === "exit") {
       const exitBox = boxen(chalk.yellow("Chat session ended !!"), {
         padding: 1,
         margin: 1,
@@ -408,7 +433,7 @@ async function chatLoop(conversation: conversationType) {
 
     await saveMessage({
       conversationId: conversation.id,
-      content: userInput,
+      content: finalContent,
       role: "user",
     });
 
@@ -439,6 +464,7 @@ async function chatLoop(conversation: conversationType) {
 
 export async function startToolChat(conversationId: string | null = null) {
   try {
+    aiService = new AiService();
     intro(
       boxen(chalk.cyan("Tool calling mode !!"), {
         padding: 1,
