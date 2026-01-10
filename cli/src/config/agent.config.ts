@@ -6,9 +6,13 @@ import { z } from "zod";
 
 import yoctoSpinner from "yocto-spinner";
 import { AiService } from "../ai/services/ai.service";
+import { runCommand } from "../lib/executor";
 
 const ApplicationSchema = z.object({
   folderName: z.string().describe("Kebab-Case folder name for the application"),
+  packageManager: z
+    .enum(["npm", "pnpm", "yarn", "bun"])
+    .describe("The package manager to use"),
   description: z.string().describe("Breif description about what was created"),
   files: z.array(
     z
@@ -28,6 +32,23 @@ const ApplicationSchema = z.object({
     )
     .optional()
     .describe("Npm dependencies with versions"),
+});
+
+const RepairSchema = z.object({
+  explaination: z
+    .string()
+    .describe("Explanation of what caused the error and how it was fixed"),
+  files: z
+    .array(
+      z.object({
+        path: z.string().describe("Relative file path to overwrite"),
+        content: z.string().describe("Corrected file content"),
+      }),
+    )
+    .describe("Only the files that needed changes"),
+  setupCommands: z.array(
+    z.string().describe("UPdated setup commands if necessary"),
+  ),
 });
 
 type ApplicationType = z.infer<typeof ApplicationSchema>;
@@ -91,6 +112,39 @@ async function createApplicationFiles(
   return appDir;
 }
 
+async function attemptRepair(
+  error: string,
+  command: string,
+  aiService: AiService,
+  currentFiles: ApplicationType["files"],
+  packageManager: string,
+) {
+  printMessage(
+    chalk.yellow(`\n⚠️  Error detected during: ${chalk.bold(command)}`),
+  );
+  printMessage(chalk.red(`${error.slice(0, 300)}...`));
+  printMessage(chalk.magenta("Attempting self-repair... 🔧"));
+
+  const fileStructure = currentFiles.map((f) => f.path).join(", ");
+  const result = await generateObject({
+    model: aiService.model,
+    schema: RepairSchema,
+    prompt: `
+        I generated an application using **${packageManager}**.
+        The file structure is: [${fileStructure}].
+
+        When running the command "${command}", I got this error:
+        ${error}
+
+        Please analyze the error and generate the FIXED content for the specific files causing the issue.
+        - Do not regenerate files that are already correct.
+        - Ensure all code is compatible with ${packageManager}.
+      `,
+  });
+
+  return result.object;
+}
+
 export async function generateApplication(
   description: string,
   aiService: AiService,
@@ -132,40 +186,124 @@ export async function generateApplication(
     spinner.stop();
     const application = result.object;
 
+    let currentFiles = application.files;
+
     printMessage(chalk.green(`\n Generated: ${application.folderName}`));
 
-    printMessage(chalk.gray(`Description: ${application.description}`));
-
-    if (application.files.length === 0) {
-      throw new Error("No files were generated");
-    }
-
-    displayFileTree(application.files, application.folderName);
-
-    printMessage(chalk.cyan("\n Creating files...\n"));
-
-    const appdir = await createApplicationFiles(
+    const appDir = await createApplicationFiles(
       cwd,
       application.folderName,
-      application.files,
+      currentFiles,
     );
+    printMessage(chalk.cyan(`Files created at: ${appDir}`));
 
-    printMessage(chalk.green.bold(`\n Application created successfully\n`));
-    printMessage(chalk.cyan(`Location: ${chalk.bold(appdir)}\n`));
+    const MAX_RETRIES = 3;
+    const pm = application.packageManager;
 
-    if (application.setupCommands.length > 0) {
-      printMessage(chalk.cyan("Next Steps: \n"));
-      printMessage(chalk.white("```bash"));
-      application.setupCommands.forEach((cmd) => {
-        printMessage(chalk.white(cmd));
-      });
+    printMessage(chalk.yellow(`\n Installing dependencies with ${pm}...`));
+    const installCmd = `${pm} install`;
 
-      printMessage(chalk.white("```\n"));
+    let installSuccess = false;
+    let installAttempts = 0;
+
+    while (!installSuccess && installAttempts < MAX_RETRIES) {
+      const res = await runCommand(installCmd, appDir);
+
+      if (res.success) {
+        printMessage(chalk.green("Dependencies installed."));
+        installSuccess = true;
+      } else {
+        installAttempts++;
+        printMessage(
+          chalk.red(
+            `Install failed (Attempt ${installAttempts}/${MAX_RETRIES})`,
+          ),
+        );
+
+        const repair = await attemptRepair(
+          res.error || "Unknown error",
+          installCmd,
+          aiService,
+          currentFiles,
+          pm,
+        );
+
+        printMessage(chalk.green(` Applying fix: ${repair.explaination}`));
+
+        await createApplicationFiles(cwd, application.folderName, repair.files);
+
+        repair.files.forEach((f) => {
+          const idx = currentFiles.findIndex((cf) => cf.path === f.path);
+          if (idx !== -1) currentFiles[idx] = f;
+          else currentFiles.push(f);
+        });
+      }
     }
 
+    if (!installSuccess) {
+      throw new Error("Failed to install dependencies after multiple repairs.");
+    }
+
+    printMessage(chalk.yellow("\nVerifying application..."));
+
+    for (let cmd of application.setupCommands) {
+      if (cmd.startsWith("cd") || cmd.includes("install")) continue;
+
+      if (
+        !cmd.startsWith(pm) &&
+        (cmd.startsWith("npm") || cmd.startsWith("bun"))
+      ) {
+        cmd = cmd.replace(/^(npm|bun|yarn|pnpm)/, pm);
+      }
+
+      let cmdSuccess = false;
+      let cmdAttempts = 0;
+
+      while (!cmdSuccess && cmdAttempts < MAX_RETRIES) {
+        printMessage(chalk.gray(`Running: ${cmd}`));
+
+        const isServer =
+          cmd.includes("start") || cmd.includes("dev") || cmd.includes("serve");
+        const res = await runCommand(cmd, appDir, isServer);
+
+        if (res.success) {
+          printMessage(chalk.green(`✅ Command passed: ${cmd}`));
+          cmdSuccess = true;
+        } else {
+          cmdAttempts++;
+          printMessage(
+            chalk.red(
+              `❌ Command failed (Attempt ${cmdAttempts}/${MAX_RETRIES})`,
+            ),
+          );
+
+          const repair = await attemptRepair(
+            res.error || "Unknown Error",
+            cmd,
+            aiService,
+            currentFiles,
+            pm,
+          );
+
+          printMessage(chalk.green(`  Applying fix: ${repair.explaination}`));
+          await createApplicationFiles(
+            cwd,
+            application.folderName,
+            repair.files,
+          );
+
+          repair.files.forEach((f) => {
+            const idx = currentFiles.findIndex((cf) => cf.path === f.path);
+            if (idx !== -1) currentFiles[idx] = f;
+            else currentFiles.push(f);
+          });
+        }
+      }
+    }
+    printMessage(chalk.green.bold(`\nApplication is ready and verified!\n`));
     return {
       folderName: application.folderName,
-      appdir,
+      appDir: appDir,
       files: application.files.map((file) => file.path),
       commands: application.setupCommands,
       success: true,

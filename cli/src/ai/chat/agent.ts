@@ -173,7 +173,7 @@ async function agentLoop(conversation: conversationType) {
         const responseMessage =
           `Generated application: ${result.folderName}\n` +
           `Files created: ${result.files.length}\n` +
-          `Location: ${result.appdir}\n` +
+          `Location: ${result.appDir}\n` +
           `Setup Commands: ${result.commands.join("\n")}`;
 
         await saveMessage({
