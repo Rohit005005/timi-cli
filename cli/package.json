@@ -1,0 +1,44 @@
+{
+  "name": "cli",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/main.js",
+  "bin": {
+    "timi-cli": "./bin.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/main.js",
+    "dev": "nodemon --watch 'src/**/*' --exec 'ts-node' src/main.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@types/marked-terminal": "^6.1.1",
+    "@types/node": "^25.0.8",
+    "nodemon": "^3.1.11",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@ai-sdk/google": "^3.0.1",
+    "@clack/prompts": "^0.11.0",
+    "@inquirer/editor": "^5.0.3",
+    "@inquirer/prompts": "^8.1.0",
+    "ai": "^6.0.3",
+    "better-auth": "^1.4.7",
+    "boxen": "^8.0.1",
+    "chalk": "^4.1.2",
+    "commander": "^14.0.2",
+    "dotenv": "^17.2.3",
+    "figlet": "^1.9.4",
+    "marked": "^17.0.1",
+    "marked-terminal": "^7.3.0",
+    "open": "^11.0.0",
+    "yocto-spinner": "^1.0.0",
+    "zod": "^4.2.1"
+  }
+}
