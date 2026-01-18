@@ -7,6 +7,7 @@ import { Suspense, useEffect, useState } from "react";
 
 const DeviceApprovalContent = () => {
   const { data, isPending } = authClient.useSession();
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const [isProcessing, setIsProcessing] = useState({
     approve: false,
@@ -21,7 +22,10 @@ const DeviceApprovalContent = () => {
         router.push("/sign-in");
       }
     }
-  }, [data, isPending, router]);
+    if (!userCode) {
+      router.push("/");
+    }
+  }, [data, isPending, router, userCode]);
 
   if (isPending) {
     return (
@@ -52,6 +56,7 @@ const DeviceApprovalContent = () => {
       console.log("Device approved successfully !!");
       router.push("/");
     } catch (error) {
+      setError("Failed to approve device !!");
       console.log("Failed to approve device", error);
     } finally {
       setIsProcessing({
@@ -84,6 +89,7 @@ const DeviceApprovalContent = () => {
       console.log("Device denied successfully !!");
       router.push("/");
     } catch (error) {
+      setError("Failed to approve device !!");
       console.log("Failed to deny device", error);
     } finally {
       setIsProcessing({
@@ -95,12 +101,15 @@ const DeviceApprovalContent = () => {
 
   return (
     <div className="flex flex-col justify-center items-center h-screen gap-4">
-      <p className="text-3xl text-white">Your user code</p>
+      <p className="text-2xl font-bold text-white">Your user code</p>
       <p className="text-2xl text-white w-fit px-10 py-5 rounded-xl bg-black">
         {userCode}
       </p>
 
-      <Button className="w-64 text-xl p-5 bg-green-600" onClick={handleApprove}>
+      <Button
+        className="w-64 text-xl p-5 border-2 border-green-900 bg-green-600"
+        onClick={handleApprove}
+      >
         {isProcessing.approve ? (
           <LoaderCircle className="animate-spin" />
         ) : (
@@ -108,12 +117,19 @@ const DeviceApprovalContent = () => {
         )}
       </Button>
       <Button
-        className="w-64 text-xl p-5"
+        className="w-64 text-xl p-5 border-2 border-red-900"
         variant={"destructive"}
         onClick={handleDeny}
       >
         {isProcessing.deny ? <LoaderCircle className="animate-spin" /> : "Deny"}
       </Button>
+      {error ? (
+        <p className="text-yellow-400 border border-yellow-700 rounded-lg text-sm px-2 py-1">
+          Error: {error}
+        </p>
+      ) : (
+        ""
+      )}
     </div>
   );
 };

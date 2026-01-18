@@ -178,7 +178,13 @@ export async function generateApplication(
       - For Python, use 'pip'.
       - For Go, use 'go'.
       - For Rust, use 'cargo'.
-      - For C++/Shell, use 'none'.`,
+      - For C++/Shell, use 'none'.
+
+      VERIFICATION RULES (CRITICAL):
+      - For Node.js/Next.js/React/Vue: You MUST include a "build" script in package.json.
+      - In 'setupCommands', you MUST include the build command (e.g., 'npm run build') to verify the code.
+      - In 'setupCommands', DO NOT rely on 'npm run dev' for verification. Prefer 'npm run build'.
+      - For Go/Rust: Include 'go build' or 'cargo build' in setupCommands.`,
     });
 
     spinner.stop();
@@ -265,6 +271,28 @@ export async function generateApplication(
         }
       }
 
+      const isDevServer =
+        cmd.includes("dev") ||
+        cmd.includes("start") ||
+        cmd.includes("watch") ||
+        cmd.includes("serve");
+
+      const isBuildCommand =
+        cmd.includes("build") || cmd.includes("compile") || cmd.includes("tsc");
+
+      if (
+        ["npm", "pnpm", "yarn", "bun", "go", "cargo"].includes(pm) &&
+        isDevServer &&
+        !isBuildCommand
+      ) {
+        printMessage(
+          chalk.gray(
+            `Skipping execution of '${cmd}' (Verification relies on build step)`,
+          ),
+        );
+        continue;
+      }
+
       let cmdSuccess = false;
       let cmdAttempts = 0;
 
@@ -272,11 +300,7 @@ export async function generateApplication(
         printMessage(chalk.gray(`Running: ${cmd}`));
 
         const isLongRunning =
-          cmd.includes("start") ||
-          cmd.includes("dev") ||
-          cmd.includes("serve") ||
-          cmd.includes("python") ||
-          cmd.startsWith("./");
+          !isBuildCommand && (cmd.includes("python") || cmd.startsWith("./"));
 
         const res = await runCommand(cmd, appDir, isLongRunning);
 

@@ -49,7 +49,6 @@ function unescapeHtml(str: string) {
 }
 
 class CustomTerminalRenderer extends Renderer {
-  // FIX: 'code' now receives a single object containing the properties
   code({
     text,
     lang,
@@ -86,12 +85,10 @@ class CustomTerminalRenderer extends Renderer {
   }
 
   paragraph(token: Tokens.Paragraph): string {
-    // parseInline processes the children tokens (bold, italic, etc.)
     return this.parser.parseInline(token.tokens) + "\n";
   }
 
   text(token: Tokens.Text | Tokens.Escape): string {
-    // Both Text and Escape tokens have a 'text' property
     return unescapeHtml(token.text);
   }
 

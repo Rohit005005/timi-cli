@@ -48,17 +48,17 @@ const DeviceAuthorizationPage = () => {
       }
     } catch (error) {
       setError("Invalid or Expired code !!");
-      console.log(error);
+      console.log("Failed to verify code", error);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col justify-center items-center h-screen gap-4">
+    <div className="flex flex-col justify-center items-center h-screen gap-3">
       <ShieldUser className="text-white size-20" strokeWidth={1} />
-      <p className="text-white text-3xl">Device Authorization</p>
-      <p className="text-white/45 text-lg">
+      <p className="text-white text-2xl font-bold">Device Authorization</p>
+      <p className="text-white/60 text-md">
         Enter your device code to continue
       </p>
 
@@ -66,9 +66,9 @@ const DeviceAuthorizationPage = () => {
         className="flex flex-col justify-center items-center gap-4 rounded-xl p-5 bg-black"
         onSubmit={handleSubmit}
       >
-        <label className="text-white text-2xl">Enter Code</label>
+        <label className="text-white font-bold text-xl">Enter Code</label>
         <input
-          className=" text-center text-white text-2xl bg-[#333333] rounded-lg p-2"
+          className=" text-center text-white text-xl bg-[#333333] rounded-lg p-2"
           type="text"
           placeholder="******"
           maxLength={9}
@@ -85,6 +85,13 @@ const DeviceAuthorizationPage = () => {
           {loading ? <LoaderCircle className="animate-spin" /> : "Submit"}
         </Button>
       </form>
+      {error ? (
+        <p className="text-yellow-400 border border-yellow-700 rounded-lg text-sm px-2 py-1">
+          Error: {error}
+        </p>
+      ) : (
+        ""
+      )}
     </div>
   );
 };

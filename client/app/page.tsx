@@ -2,14 +2,15 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, UserRoundCheck } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function Home() {
   const { data, isPending } = authClient.useSession();
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!isPending) {
@@ -30,7 +31,7 @@ export default function Home() {
   return (
     <div className="flex flex-col h-screen justify-center items-center">
       <Card className="bg-black w-125 border-2 border-gray-600">
-        <CardContent className="flex flex-col justify-center items-center">
+        <CardContent className="flex flex-col justify-center items-center gap-4">
           {data?.user.image && (
             <Image
               src={data?.user.image}
@@ -41,19 +42,21 @@ export default function Home() {
             />
           )}
 
-          <p className="text-white text-2xl">Welcome {data?.user.name}</p>
+          <p className="text-white font-bold text-2xl">
+            Welcome {data?.user.name}
+          </p>
+          <p className=" text-white/60 text-sm">{data?.user.email}</p>
 
-          <p className=" text-gray-600 text-sm my-5">Authenticated User</p>
-
-          <div>
-            <p className="text-white">Email address</p>
-            <p className=" text-gray-600 text-sm">{data?.user.email}</p>
-          </div>
+          <p className="text-white text-md flex gap-2">
+            <UserRoundCheck className="text-white" size={20} />
+            Authenticated User
+          </p>
 
           <Button
             variant={"destructive"}
-            className="cursor-pointer mt-10 w-[60%]"
+            className="cursor-pointer w-[60%]"
             onClick={async () => {
+              setLoading(true);
               await authClient.signOut({
                 fetchOptions: {
                   onSuccess: () => {
@@ -61,9 +64,14 @@ export default function Home() {
                   },
                 },
               });
+              setLoading(false);
             }}
           >
-            Sign Out
+            {loading ? (
+              <LoaderCircle className="size-5 animate-spin text-white" />
+            ) : (
+              <p>Sign Out</p>
+            )}
           </Button>
         </CardContent>
       </Card>
