@@ -2,8 +2,9 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
-import { LoaderCircle, UserRoundCheck } from "lucide-react";
+import { ArrowRight, LoaderCircle, UserRoundCheck } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -75,6 +76,10 @@ export default function Home() {
           </Button>
         </CardContent>
       </Card>
+      <Link href="/device" className="flex items-center text-sm border-b my-2">
+        Verfy device code{" "}
+        <ArrowRight size={18} strokeWidth={1.5} className="text-white" />
+      </Link>
     </div>
   );
 }
