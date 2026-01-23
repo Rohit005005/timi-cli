@@ -76,8 +76,11 @@ export default function Home() {
           </Button>
         </CardContent>
       </Card>
-      <Link href="/device" className="flex items-center text-sm border-b my-2">
-        Verfy device code{" "}
+      <Link
+        href="/device"
+        className="flex items-center text-sm border-b my-2 text-white"
+      >
+        Verfy device code
         <ArrowRight size={18} strokeWidth={1.5} className="text-white" />
       </Link>
     </div>
